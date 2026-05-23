@@ -346,6 +346,7 @@
     const margin = 16;
     const maxX = window.innerWidth  - bw - margin;
     const maxY = window.innerHeight - bh - margin;
+    const minY = Math.max(margin, window.innerHeight * 0.25); // 25% desde arriba en móvil
     
     // Generate random position that doesn't overlap NO button
     let x, y;
@@ -354,7 +355,7 @@
     
     while (collision && attempts < 10) {
       x = margin + Math.random() * maxX;
-      y = Math.max(130, margin + Math.random() * Math.max(1, maxY - 130));
+      y = minY + Math.random() * Math.max(1, maxY - minY);
       
       // Check if this position would overlap with NO button
       const yesRect = {
