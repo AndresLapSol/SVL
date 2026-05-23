@@ -85,11 +85,17 @@
     .gift-lead { font-size:clamp(1rem,3vw,1.2rem); color:var(--color-text-muted); margin-bottom:0.75rem; max-width:48ch; }
     #question-text { font-family:var(--font-display); font-size:clamp(1.2rem,4vw,1.8rem); color:var(--color-text); font-style:italic; margin-bottom:2.5rem; min-height:2.5em; transition:opacity 0.25s ease; }
 
-    /* YES button — shrinks slightly */
-    .btn-yes { background:var(--color-primary); color:#fff; font-size:clamp(0.95rem,2.5vw,1.05rem); font-weight:600; padding:0.85rem 1.8rem; border-radius:var(--radius-full); box-shadow:var(--shadow-md); transition:background var(--t),box-shadow var(--t),transform 0.5s cubic-bezier(0.16,1,0.3,1); white-space:nowrap; flex-shrink:0; }
+    /* YES button — escapes and shrinks */
+    .btn-yes { 
+      position: relative;
+      background:var(--color-primary); color:#fff; font-size:clamp(0.95rem,2.5vw,1.05rem); font-weight:600; padding:0.85rem 1.8rem; border-radius:var(--radius-full); box-shadow:var(--shadow-md); transition:background var(--t),box-shadow var(--t),transform 0.5s cubic-bezier(0.16,1,0.3,1),left 0.4s cubic-bezier(0.16,1,0.3,1),top 0.4s cubic-bezier(0.16,1,0.3,1); white-space:nowrap; flex-shrink:0; z-index: 100;
+    }
     .btn-yes:hover { background:var(--color-primary-hover); box-shadow:var(--shadow-lg); }
+    .btn-yes.escaped {
+      position: fixed;
+    }
 
-    /* NO button — starts inline, becomes fixed after first escape */
+    /* NO button — stays in place, grows */
     .btn-no {
       position: relative;
       background: var(--color-surface-2); color: var(--color-text-muted);
@@ -97,15 +103,10 @@
       border: 2px solid var(--color-divider);
       white-space: nowrap;
       transition: font-size 0.5s cubic-bezier(0.16,1,0.3,1),
-                  padding 0.5s cubic-bezier(0.16,1,0.3,1),
-                  left 0.4s cubic-bezier(0.16,1,0.3,1),
-                  top 0.4s cubic-bezier(0.16,1,0.3,1);
+                  padding 0.5s cubic-bezier(0.16,1,0.3,1);
       z-index: 100;
     }
     .btn-no:hover { background:var(--color-accent); }
-    .btn-no.escaped {
-      position: fixed;
-    }
 
     .step-counter { font-size:clamp(0.7rem,2vw,0.85rem); color:var(--color-text-faint); font-style:italic; min-height:1.2em; margin-top:0.5rem; }
 
@@ -322,32 +323,59 @@
 
   /* Place No button near center initially */
   function initNoPosition() {
-    const bw = btnNo.offsetWidth  || 100;
-    const bh = btnNo.offsetHeight || 44;
-    btnNo.style.left = ((window.innerWidth  - bw) / 2) + 'px';
-    btnNo.style.top  = ((window.innerHeight - bh) / 2 + 80) + 'px';
+    // Button starts inline, no positioning needed
   }
 
   /* First call: switch to fixed so it can go anywhere; subsequent calls: just move */
-  function escapeNo() {
-    if (!btnNo.classList.contains('escaped')) {
+  function escapeSi() {
+    if (!btnYes.classList.contains('escaped')) {
       // Capture current screen position before switching to fixed
-      const rect = btnNo.getBoundingClientRect();
-      btnNo.classList.add('escaped');
-      btnNo.style.left = rect.left + 'px';
-      btnNo.style.top  = rect.top  + 'px';
+      const rect = btnYes.getBoundingClientRect();
+      btnYes.classList.add('escaped');
+      btnYes.style.left = rect.left + 'px';
+      btnYes.style.top  = rect.top  + 'px';
       // Force a reflow so the transition sees the starting position
-      btnNo.getBoundingClientRect();
+      btnYes.getBoundingClientRect();
     }
-    const bw = btnNo.offsetWidth  || 120;
-    const bh = btnNo.offsetHeight || 60;
+    const bw = btnYes.offsetWidth  || 120;
+    const bh = btnYes.offsetHeight || 60;
+    
+    // Get NO button position to avoid covering it
+    const noRect = btnNo.getBoundingClientRect();
+    
     const margin = 16;
     const maxX = window.innerWidth  - bw - margin;
     const maxY = window.innerHeight - bh - margin;
-    const x = margin + Math.random() * maxX;
-    const y = Math.max(130, margin + Math.random() * Math.max(1, maxY - 130));
-    btnNo.style.left = x + 'px';
-    btnNo.style.top  = y + 'px';
+    
+    // Generate random position that doesn't overlap NO button
+    let x, y;
+    let attempts = 0;
+    let collision = true;
+    
+    while (collision && attempts < 10) {
+      x = margin + Math.random() * maxX;
+      y = Math.max(130, margin + Math.random() * Math.max(1, maxY - 130));
+      
+      // Check if this position would overlap with NO button
+      const yesRect = {
+        left: x,
+        top: y,
+        right: x + bw,
+        bottom: y + bh
+      };
+      
+      // 50px buffer around NO button
+      const buffer = 50;
+      collision = !(yesRect.right + buffer < noRect.left || 
+                    yesRect.left - buffer > noRect.right || 
+                    yesRect.bottom + buffer < noRect.top || 
+                    yesRect.top - buffer > noRect.bottom);
+      
+      attempts++;
+    }
+    
+    btnYes.style.left = x + 'px';
+    btnYes.style.top  = y + 'px';
   }
 
   function applyStep(s) {
@@ -370,11 +398,11 @@
     vibrate([80, 40, 80]);   // double buzz — "wrong!"
 
     if (noHitCount === 1) {
-      // First hit: escape only
-      escapeNo();
+      // First hit: escape YES only
+      escapeSi();
     } else {
-      // 2nd+ hit: show error modal AND escape after closing
-      escapeNo();
+      // 2nd+ hit: show error modal AND escape YES after closing
+      escapeSi();
       openError();
     }
   }
@@ -387,11 +415,11 @@
       questionEl.style.opacity = '0';
       setTimeout(() => { questionEl.textContent = questions[step]; questionEl.style.opacity = '1'; }, 220);
       applyStep(step);
-      // Every time Sí is pressed, the No escapes a little too (teasing)
-      setTimeout(escapeNo, 300);
+      // Every time Sí is pressed, it escapes a little too (teasing)
+      setTimeout(escapeSi, 300);
     } else {
       document.getElementById('gift-section').style.display = 'none';
-      btnNo.style.display = 'none';
+      btnYes.style.display = 'none';
       const reveal = document.getElementById('reveal-section');
       reveal.classList.add('show');
       reveal.scrollIntoView({ behavior: 'smooth' });
@@ -477,7 +505,7 @@
 
   /* Init */
   window.addEventListener('load', () => { applyStep(0); });
-  window.addEventListener('resize', escapeNo);
+  window.addEventListener('resize', escapeSi);
 </script>
 </body>
 </html>
